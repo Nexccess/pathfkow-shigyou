@@ -645,5 +645,769 @@ function switchCase(idx){
   document.querySelectorAll('.case-content').forEach((c,i) => c.classList.toggle('active', i===idx));
 }
 </script>
+
+<!-- ════════════════════════════════════════════
+     PATH-FLOW 士業DX診断 — 診断・送信・予約システム
+     ════════════════════════════════════════════ -->
+<style>
+/* ── 診断モーダル ── */
+#dx-modal-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(11,26,62,.72);
+  backdrop-filter: blur(6px);
+  align-items: center; justify-content: center;
+}
+#dx-modal-overlay.open { display: flex; }
+#dx-modal {
+  background: #fff;
+  border-radius: 12px;
+  width: min(680px, 94vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 32px 80px rgba(11,26,62,.28);
+  padding: 0;
+  animation: modalIn .3s ease;
+}
+@keyframes modalIn {
+  from { opacity:0; transform: scale(.96) translateY(16px); }
+  to   { opacity:1; transform: scale(1)  translateY(0); }
+}
+/* ── モーダルヘッダー ── */
+#dx-modal-head {
+  background: #0B1A3E;
+  padding: 28px 36px 20px;
+  border-radius: 12px 12px 0 0;
+  display: flex; align-items: center; justify-content: space-between;
+}
+#dx-modal-head h3 {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 18px; font-weight: 700;
+  color: #fff; margin: 0;
+}
+#dx-modal-close {
+  background: none; border: none; cursor: pointer;
+  color: rgba(255,255,255,.6); font-size: 22px; line-height: 1;
+  transition: color .15s;
+}
+#dx-modal-close:hover { color: #fff; }
+/* ── プログレスバー ── */
+#dx-progress-wrap {
+  padding: 20px 36px 0;
+  background: #f8f7f4;
+  border-bottom: 1px solid #E0DDD5;
+}
+#dx-progress-label {
+  font-size: 12px; color: #7A7A9A;
+  letter-spacing: 1px; margin-bottom: 8px;
+}
+#dx-progress-bar-bg {
+  height: 4px; background: #E0DDD5; border-radius: 2px; overflow: hidden;
+}
+#dx-progress-bar {
+  height: 100%; background: linear-gradient(90deg, #E2C870, #C8A84B);
+  border-radius: 2px; transition: width .4s ease;
+}
+/* ── 質問パネル ── */
+#dx-body { padding: 32px 36px; }
+.dx-step { display: none; }
+.dx-step.active { display: block; animation: fadeUp .3s ease both; }
+.dx-q-num {
+  font-family: 'Cinzel', serif;
+  font-size: 11px; letter-spacing: 3px; color: #C8A84B;
+  text-transform: uppercase; margin-bottom: 10px; display: block;
+}
+.dx-q-text {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 20px; font-weight: 600; color: #0B1A3E;
+  line-height: 1.5; margin-bottom: 24px;
+}
+.dx-options { display: flex; flex-direction: column; gap: 10px; }
+.dx-option {
+  display: flex; align-items: flex-start; gap: 14px;
+  background: #F8F7F4; border: 1.5px solid #E0DDD5;
+  border-radius: 8px; padding: 14px 18px;
+  cursor: pointer; transition: all .2s;
+  font-size: 16px; color: #1A1A2E; line-height: 1.5;
+}
+.dx-option:hover {
+  border-color: #C8A84B; background: #FDF6E3;
+}
+.dx-option.selected {
+  border-color: #C8A84B; background: #FDF6E3;
+  box-shadow: 0 0 0 3px rgba(200,168,75,.18);
+}
+.dx-option-num {
+  flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: #E0DDD5; color: #7A7A9A;
+  font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s;
+}
+.dx-option.selected .dx-option-num {
+  background: #C8A84B; color: #0B1A3E;
+}
+/* ── ナビゲーション ── */
+#dx-nav {
+  display: flex; gap: 12px; justify-content: flex-end;
+  padding-top: 28px; margin-top: 8px;
+  border-top: 1px solid #E0DDD5;
+}
+.dx-btn-back {
+  background: none; border: 1.5px solid #E0DDD5;
+  color: #7A7A9A; font-size: 15px;
+  padding: 11px 24px; border-radius: 4px; cursor: pointer;
+  font-family: 'Noto Sans JP', sans-serif;
+  transition: all .2s;
+}
+.dx-btn-back:hover { border-color: #0B1A3E; color: #0B1A3E; }
+.dx-btn-next {
+  background: linear-gradient(135deg, #E2C870, #C8A84B);
+  border: none; color: #0B1A3E;
+  font-size: 15px; font-weight: 700;
+  padding: 12px 32px; border-radius: 4px; cursor: pointer;
+  font-family: 'Noto Sans JP', sans-serif;
+  box-shadow: 0 4px 16px rgba(200,168,75,.28);
+  transition: all .2s;
+}
+.dx-btn-next:hover { opacity: .9; transform: translateY(-1px); }
+.dx-btn-next:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+/* ── 結果パネル ── */
+#dx-result { display: none; }
+#dx-result.active { display: block; animation: fadeUp .4s ease both; }
+#dx-score-ring {
+  width: 120px; height: 120px; margin: 0 auto 24px;
+  position: relative; display: flex; align-items: center; justify-content: center;
+}
+#dx-score-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+#dx-score-val {
+  font-family: 'Cinzel', serif;
+  font-size: 36px; font-weight: 700; color: #C8A84B;
+  line-height: 1; z-index: 1;
+}
+#dx-score-label { text-align: center; margin-bottom: 28px; }
+#dx-score-title {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 22px; font-weight: 700; color: #0B1A3E;
+  margin-bottom: 6px;
+}
+#dx-score-sub { font-size: 14px; color: #7A7A9A; }
+#dx-result-cards {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 28px;
+}
+.dx-result-card {
+  border-radius: 8px; padding: 20px;
+}
+.dx-result-card.problem {
+  background: #FFF5F5; border: 1px solid #FCCACA;
+}
+.dx-result-card.solution {
+  background: #F0FDF4; border: 1px solid #86EFAC;
+}
+.dx-result-card h4 {
+  font-size: 13px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; font-family: 'Cinzel', serif;
+  margin-bottom: 10px;
+}
+.dx-result-card.problem h4 { color: #DC2626; }
+.dx-result-card.solution h4 { color: #16A34A; }
+.dx-result-card ul { list-style: none; padding: 0; }
+.dx-result-card ul li {
+  font-size: 14px; color: #1A1A2E; line-height: 1.7;
+  padding: 4px 0; border-bottom: 1px solid rgba(0,0,0,.06);
+}
+.dx-result-card ul li:last-child { border: none; }
+.dx-result-card ul li::before { content: '• '; color: inherit; }
+
+/* ── フォーム（予約） ── */
+#dx-booking-form { margin-top: 24px; }
+#dx-booking-form h4 {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 17px; font-weight: 700; color: #0B1A3E;
+  margin-bottom: 14px; text-align: center;
+}
+.dx-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.dx-input {
+  width: 100%; padding: 12px 14px; font-size: 15px;
+  font-family: 'Noto Sans JP', sans-serif;
+  border: 1.5px solid #E0DDD5; border-radius: 4px;
+  color: #1A1A2E; outline: none; transition: border-color .2s;
+}
+.dx-input::placeholder { color: #7A7A9A; }
+.dx-input:focus { border-color: #C8A84B; }
+.dx-submit {
+  width: 100%; padding: 18px; font-size: 17px; font-weight: 700;
+  font-family: 'Noto Sans JP', sans-serif; color: #0B1A3E;
+  background: linear-gradient(135deg, #E2C870, #C8A84B);
+  border: none; border-radius: 4px; cursor: pointer;
+  box-shadow: 0 6px 24px rgba(200,168,75,.28); transition: all .2s;
+  margin-top: 4px;
+}
+.dx-submit:hover { opacity: .9; transform: translateY(-1px); }
+.dx-submit:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* ── 送信完了 ── */
+#dx-complete { display: none; text-align: center; padding: 16px 0; }
+#dx-complete.active { display: block; animation: fadeUp .4s ease both; }
+.dx-complete-icon { font-size: 52px; margin-bottom: 16px; }
+#dx-complete h3 {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 22px; font-weight: 700; color: #0B1A3E; margin-bottom: 10px;
+}
+#dx-complete p { font-size: 16px; color: #4A4A6A; line-height: 1.8; margin-bottom: 24px; }
+#dx-gcal-btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: #0B1A3E; color: #fff;
+  padding: 14px 28px; border-radius: 4px;
+  text-decoration: none; font-size: 15px; font-weight: 500;
+  transition: all .2s; margin-bottom: 12px;
+}
+#dx-gcal-btn:hover { background: #1A2F6A; }
+
+/* ── 診断CTAボタン（LP内） ── */
+.dx-trigger-btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: 16px; font-weight: 700;
+  color: #0B1A3E; background: linear-gradient(135deg, #E2C870, #C8A84B);
+  padding: 16px 36px; border-radius: 4px; border: none; cursor: pointer;
+  box-shadow: 0 6px 24px rgba(200,168,75,.3);
+  transition: all .2s; font-family: 'Noto Sans JP', sans-serif;
+  text-decoration: none;
+}
+.dx-trigger-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(200,168,75,.4); }
+
+/* ── 診断セクション（LP内） ── */
+#dx-section {
+  padding: 100px 0;
+  background: linear-gradient(160deg, #0B1A3E 0%, #1A2F6A 100%);
+  text-align: center;
+}
+#dx-section .section-label { color: #C8A84B; border-color: #C8A84B; }
+#dx-section h2 {
+  font-family: 'Noto Serif JP', serif;
+  font-size: clamp(24px, 3.5vw, 40px); font-weight: 700;
+  color: #fff; line-height: 1.4; margin-bottom: 16px;
+}
+#dx-section p {
+  font-size: 17px; color: rgba(255,255,255,.7);
+  max-width: 560px; margin: 0 auto 40px; line-height: 1.8;
+}
+.dx-features {
+  display: flex; justify-content: center; gap: 32px;
+  flex-wrap: wrap; margin-bottom: 48px;
+}
+.dx-feature {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; color: rgba(255,255,255,.75);
+}
+.dx-feature-dot { width: 6px; height: 6px; border-radius: 50%; background: #C8A84B; }
+
+/* ── エラーメッセージ ── */
+.dx-error { font-size: 13px; color: #DC2626; margin-top: 6px; display: none; }
+.dx-error.show { display: block; }
+
+/* ── スピナー ── */
+.dx-spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(11,26,62,.2); border-top-color: #0B1A3E; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 8px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media(max-width: 600px) {
+  #dx-body { padding: 24px 20px; }
+  #dx-modal-head { padding: 20px 20px 16px; }
+  #dx-progress-wrap { padding: 16px 20px 0; }
+  #dx-result-cards { grid-template-columns: 1fr; }
+  .dx-form-row { grid-template-columns: 1fr; }
+}
+</style>
+
+<!-- ══ 診断セクション（LP内） ══ -->
+<section id="dx-section">
+  <div class="container">
+    <span class="section-label">AI Diagnosis</span>
+    <h2 class="serif">3分で分かる、<br><span style="color:#C8A84B">あなたの事務所のDX現在地。</span></h2>
+    <p>Path-Flowの診断AIが、今の課題と最適な改善ルートを無料で可視化します。<br>診断後、担当者との個別相談（30分）を予約できます。</p>
+    <div class="dx-features">
+      <div class="dx-feature"><span class="dx-feature-dot"></span>所要時間：約3分</div>
+      <div class="dx-feature"><span class="dx-feature-dot"></span>完全無料</div>
+      <div class="dx-feature"><span class="dx-feature-dot"></span>診断後に個別相談を予約可能</div>
+      <div class="dx-feature"><span class="dx-feature-dot"></span>強引な営業は一切なし</div>
+    </div>
+    <button class="dx-trigger-btn" onclick="DX.open()">
+      ▶ 無料で士業DX診断を始める
+    </button>
+  </div>
+</section>
+
+<!-- ══ 診断モーダル ══ -->
+<div id="dx-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="dx-modal-title">
+  <div id="dx-modal">
+
+    <!-- ヘッダー -->
+    <div id="dx-modal-head">
+      <h3 id="dx-modal-title">🔍 士業DX診断 — Path-Flow</h3>
+      <button id="dx-modal-close" onclick="DX.close()" aria-label="閉じる">✕</button>
+    </div>
+
+    <!-- プログレス -->
+    <div id="dx-progress-wrap">
+      <div id="dx-progress-label">質問 1 / 4</div>
+      <div id="dx-progress-bar-bg">
+        <div id="dx-progress-bar" style="width:25%"></div>
+      </div>
+      <div style="height:16px"></div>
+    </div>
+
+    <!-- 質問本体 -->
+    <div id="dx-body">
+
+      <!-- Q1 -->
+      <div class="dx-step active" data-step="1">
+        <span class="dx-q-num">Question 01 · 問い合わせ対応</span>
+        <p class="dx-q-text">新規問い合わせへの<br>初動対応は、どのように行っていますか？</p>
+        <div class="dx-options">
+          <div class="dx-option" data-val="1"><span class="dx-option-num">A</span>すべて電話・対面で手動対応している</div>
+          <div class="dx-option" data-val="2"><span class="dx-option-num">B</span>メールで受け付けるが、返信は手動</div>
+          <div class="dx-option" data-val="3"><span class="dx-option-num">C</span>Webフォームがあり、自動返信メールは送っている</div>
+          <div class="dx-option" data-val="4"><span class="dx-option-num">D</span>チャットボットや自動FAQ等で一部自動化している</div>
+          <div class="dx-option" data-val="5"><span class="dx-option-num">E</span>AI・自動化ツールで初動〜振り分けまで自動対応</div>
+        </div>
+      </div>
+
+      <!-- Q2 -->
+      <div class="dx-step" data-step="2">
+        <span class="dx-q-num">Question 02 · 顧客データ管理</span>
+        <p class="dx-q-text">顧客情報・案件データは<br>どのように管理していますか？</p>
+        <div class="dx-options">
+          <div class="dx-option" data-val="1"><span class="dx-option-num">A</span>紙の書類・手書き台帳が中心</div>
+          <div class="dx-option" data-val="2"><span class="dx-option-num">B</span>ExcelやWordで管理している</div>
+          <div class="dx-option" data-val="3"><span class="dx-option-num">C</span>Googleスプレッドシート等クラウドで共有</div>
+          <div class="dx-option" data-val="4"><span class="dx-option-num">D</span>専用のCRM・顧客管理システムを使用</div>
+          <div class="dx-option" data-val="5"><span class="dx-option-num">E</span>CRMと会計・申告ソフトが連携・自動連携している</div>
+        </div>
+      </div>
+
+      <!-- Q3 -->
+      <div class="dx-step" data-step="3">
+        <span class="dx-q-num">Question 03 · 情報発信</span>
+        <p class="dx-q-text">SNS・コラム・メルマガ等での<br>情報発信は、どのくらいの頻度ですか？</p>
+        <div class="dx-options">
+          <div class="dx-option" data-val="1"><span class="dx-option-num">A</span>ほとんど発信していない</div>
+          <div class="dx-option" data-val="2"><span class="dx-option-num">B</span>月に1回未満、不定期</div>
+          <div class="dx-option" data-val="3"><span class="dx-option-num">C</span>月に1〜3回程度</div>
+          <div class="dx-option" data-val="4"><span class="dx-option-num">D</span>週に1回以上、定期的に発信</div>
+          <div class="dx-option" data-val="5"><span class="dx-option-num">E</span>複数媒体で週複数回、コンテンツを計画的に配信</div>
+        </div>
+      </div>
+
+      <!-- Q4 -->
+      <div class="dx-step" data-step="4">
+        <span class="dx-q-num">Question 04 · 予約・商談管理</span>
+        <p class="dx-q-text">商談・相談の予約受付は<br>どのように行っていますか？</p>
+        <div class="dx-options">
+          <div class="dx-option" data-val="1"><span class="dx-option-num">A</span>電話のみで受け付けている</div>
+          <div class="dx-option" data-val="2"><span class="dx-option-num">B</span>メール・FAXで都度調整している</div>
+          <div class="dx-option" data-val="3"><span class="dx-option-num">C</span>Webフォームから予約を受け付けている</div>
+          <div class="dx-option" data-val="4"><span class="dx-option-num">D</span>カレンダー連携の自動予約ツールを使用</div>
+          <div class="dx-option" data-val="5"><span class="dx-option-num">E</span>AIスコアリング連動の自動予約で事前情報も取得</div>
+        </div>
+      </div>
+
+      <!-- 結果パネル -->
+      <div id="dx-result">
+        <div id="dx-score-ring">
+          <svg viewBox="0 0 120 120" width="120" height="120">
+            <circle cx="60" cy="60" r="52" fill="none" stroke="#E0DDD5" stroke-width="8"/>
+            <circle id="dx-ring-arc" cx="60" cy="60" r="52" fill="none"
+              stroke="#C8A84B" stroke-width="8" stroke-linecap="round"
+              stroke-dasharray="326.7" stroke-dashoffset="326.7"
+              style="transition: stroke-dashoffset 1s ease"/>
+          </svg>
+          <span id="dx-score-val">0</span>
+        </div>
+        <div id="dx-score-label">
+          <div id="dx-score-title"></div>
+          <div id="dx-score-sub"></div>
+        </div>
+        <div id="dx-result-cards">
+          <div class="dx-result-card problem">
+            <h4>Current Issues</h4>
+            <ul id="dx-issues-list"></ul>
+          </div>
+          <div class="dx-result-card solution">
+            <h4>Path-Flow Effects</h4>
+            <ul id="dx-effects-list"></ul>
+          </div>
+        </div>
+
+        <!-- 予約フォーム -->
+        <div id="dx-booking-form">
+          <h4>📅 個別相談を無料で予約する（30分）</h4>
+          <div class="dx-form-row">
+            <input type="text"  class="dx-input" id="dx-name"  placeholder="お名前（必須）">
+            <input type="text"  class="dx-input" id="dx-office" placeholder="事務所名（任意）">
+          </div>
+          <div class="dx-form-row">
+            <input type="email" class="dx-input" id="dx-email" placeholder="メールアドレス（必須）">
+            <input type="tel"   class="dx-input" id="dx-tel"   placeholder="電話番号（任意）">
+          </div>
+          <div class="dx-error" id="dx-form-error">お名前とメールアドレスをご入力ください。</div>
+          <button class="dx-submit" id="dx-submit-btn" onclick="DX.submit()">
+            相談を予約して診断レポートを受け取る →
+          </button>
+          <p style="font-size:12px;color:#7A7A9A;text-align:center;margin-top:10px;">
+            ※診断結果・ご入力情報は担当者との面談準備にのみ使用します。
+          </p>
+        </div>
+      </div><!-- /#dx-result -->
+
+      <!-- 送信完了 -->
+      <div id="dx-complete">
+        <div class="dx-complete-icon">✅</div>
+        <h3>ご予約ありがとうございます</h3>
+        <p>担当者より<strong>24時間以内</strong>にメールにてご連絡いたします。<br>
+          下のボタンからGoogleカレンダーに仮登録しておくことをお勧めします。</p>
+        <a id="dx-gcal-btn" href="#" target="_blank" rel="noopener">
+          📅 Googleカレンダーに追加する
+        </a>
+        <div>
+          <button onclick="DX.close()" style="background:none;border:none;font-size:14px;color:#7A7A9A;cursor:pointer;text-decoration:underline;margin-top:8px;">
+            閉じる
+          </button>
+        </div>
+      </div><!-- /#dx-complete -->
+
+      <!-- ナビゲーション -->
+      <div id="dx-nav">
+        <button class="dx-btn-back" id="dx-back-btn" onclick="DX.prev()" style="display:none">← 戻る</button>
+        <button class="dx-btn-next" id="dx-next-btn" onclick="DX.next()" disabled>次へ →</button>
+      </div>
+
+    </div><!-- /#dx-body -->
+  </div><!-- /#dx-modal -->
+</div><!-- /#dx-modal-overlay -->
+
+<script>
+/* ═══════════════════════════════════════════════════
+   PATH-FLOW 士業DX診断エンジン
+   ───────────────────────────────────────────────────
+   ★ 接続設定（GAS URLを設定してください）
+   ═══════════════════════════════════════════════════ */
+const DX_CONFIG = {
+  // ▼▼▼ GAS デプロイURL（1号機から流用）
+  GAS_ENDPOINT: 'YOUR_GAS_ENDPOINT_URL',
+  // ▼▼▼ Google Calendar: 担当者のカレンダーID または予約URL
+  GCAL_BASE: 'https://calendar.google.com/calendar/render?action=TEMPLATE',
+  SERVICE_NAME: 'Path-Flow 士業DX診断 個別相談',
+};
+
+/* ─── スコア定義 ─────────────────────────────────── */
+const DX_LEVELS = [
+  null, // index 0 unused
+  {
+    range: [4, 8],
+    title: 'DX未着手 — レベル1',
+    sub: 'スコア: {score}/20　業界平均を大きく下回っています',
+    issues: [
+      'アナログ業務が多く、先生の時間が単純作業に消えている',
+      '顧客データが散在し、案件の抜け漏れリスクがある',
+      '情報発信がなく、新規集客が紹介のみに依存',
+      '予約対応に多くの工数がかかり、機会損失が発生している',
+    ],
+    effects: [
+      'AI診断フォームで初回ヒアリングを完全自動化',
+      'スコアリングで「本気客」のみを先生に届ける',
+      '顧客データをSS連携で一元管理・即時参照可能',
+      '自動予約システムで24h受付を実現',
+    ],
+  },
+  {
+    range: [9, 12],
+    title: 'DX入門期 — レベル2',
+    sub: 'スコア: {score}/20　基礎の整備はできています',
+    issues: [
+      '一部デジタル化されているが、ツールが連携していない',
+      'データ入力・転記の二重作業が発生している',
+      '情報発信は散発的で集客への貢献度が低い',
+      '予約受付と顧客管理が分断されている',
+    ],
+    effects: [
+      '診断→予約→データ蓄積を一気通貫で自動化',
+      'Looker Studioで顧客データをリアルタイム可視化',
+      'AIが「この顧客には何を提案すべきか」を事前に助言',
+      'バラバラなツールをPath-Flowが統合',
+    ],
+  },
+  {
+    range: [13, 16],
+    title: 'DX移行期 — レベル3',
+    sub: 'スコア: {score}/20　あと一歩で高収益モデルへ',
+    issues: [
+      'デジタル化は進んでいるが、高単価案件への誘導が弱い',
+      '診断・スコアリングの仕組みがなく商談確度が不明',
+      '情報発信はあるが、問い合わせへの転換率が低い',
+      'データはあるが、営業戦略への活用が不十分',
+    ],
+    effects: [
+      'AI診断で「高確度見込み客」だけに時間を集中',
+      'スコアに連動した個別提案でクロージング率向上',
+      'コンテンツ→診断→予約の導線を自動構築',
+      'Looker Studioで営業KPIをリアルタイム把握',
+    ],
+  },
+  {
+    range: [17, 19],
+    title: 'DX活用期 — レベル4',
+    sub: 'スコア: {score}/20　Path-Flowで完全自動化へ',
+    issues: [
+      '高水準だが、AI活用による更なる効率化の余地がある',
+      '診断前スコアリングで商談の「質」をさらに上げられる',
+      '予約〜面談〜成約のデータが分析に活かしきれていない',
+    ],
+    effects: [
+      'AI伴走アドバイスで商談成約率を最大化',
+      '診断データの蓄積でマーケティングを高度化',
+      'ITツール連携を最適化し、業務コストをさらに削減',
+    ],
+  },
+  {
+    range: [20, 20],
+    title: 'DX最適化 — レベル5',
+    sub: 'スコア: {score}/20　業界トップクラスの先進事務所',
+    issues: [
+      '現状は最高水準。競合との差別化維持が課題',
+    ],
+    effects: [
+      'Path-Flowでさらなる高付加価値化・ブランディングを',
+      'AI診断コンテンツで差別化した集客モデルを構築',
+    ],
+  },
+];
+
+/* ─── 診断エンジン ─────────────────────────────── */
+const DX = (() => {
+  let currentStep = 1;
+  const TOTAL = 4;
+  const answers = {}; // { 1: val, 2: val, ... }
+
+  const $ = id => document.getElementById(id);
+
+  function open() {
+    reset();
+    $('dx-modal-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function close() {
+    $('dx-modal-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function reset() {
+    currentStep = 1;
+    Object.keys(answers).forEach(k => delete answers[k]);
+    document.querySelectorAll('.dx-step').forEach(s => s.classList.remove('active'));
+    document.querySelector('[data-step="1"]').classList.add('active');
+    $('dx-result').style.display = 'none';
+    $('dx-complete').style.display = 'none';
+    $('dx-complete').classList.remove('active');
+    $('dx-nav').style.display = 'flex';
+    $('dx-progress-wrap').style.display = 'block';
+    document.querySelectorAll('.dx-option').forEach(o => o.classList.remove('selected'));
+    $('dx-name').value = $('dx-office').value = $('dx-email').value = $('dx-tel').value = '';
+    $('dx-form-error').classList.remove('show');
+    updateUI();
+  }
+
+  function updateUI() {
+    const isQuestionStep = currentStep <= TOTAL;
+    $('dx-progress-label').textContent = isQuestionStep
+      ? `質問 ${currentStep} / ${TOTAL}`
+      : '診断結果';
+    $('dx-progress-bar').style.width = isQuestionStep
+      ? `${(currentStep / TOTAL) * 100}%`
+      : '100%';
+    $('dx-back-btn').style.display = currentStep > 1 ? 'inline-block' : 'none';
+    const hasAnswer = answers[currentStep] !== undefined;
+    $('dx-next-btn').disabled = !hasAnswer;
+    if (!isQuestionStep) {
+      $('dx-next-btn').style.display = 'none';
+    } else {
+      $('dx-next-btn').style.display = 'inline-block';
+      $('dx-next-btn').textContent = currentStep < TOTAL ? '次へ →' : '診断結果を見る';
+    }
+  }
+
+  function selectOption(el, step, val) {
+    document.querySelectorAll(`[data-step="${step}"] .dx-option`)
+      .forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    answers[step] = val;
+    updateUI();
+  }
+
+  function next() {
+    if (!answers[currentStep]) return;
+    if (currentStep < TOTAL) {
+      document.querySelector(`[data-step="${currentStep}"]`).classList.remove('active');
+      currentStep++;
+      document.querySelector(`[data-step="${currentStep}"]`).classList.add('active');
+      updateUI();
+    } else {
+      showResult();
+    }
+  }
+
+  function prev() {
+    if (currentStep <= 1) return;
+    if (currentStep > TOTAL) {
+      $('dx-result').style.display = 'none';
+      currentStep = TOTAL;
+      document.querySelector(`[data-step="${TOTAL}"]`).classList.add('active');
+      $('dx-nav').style.display = 'flex';
+      $('dx-progress-wrap').style.display = 'block';
+    } else {
+      document.querySelector(`[data-step="${currentStep}"]`).classList.remove('active');
+      currentStep--;
+      document.querySelector(`[data-step="${currentStep}"]`).classList.add('active');
+    }
+    updateUI();
+  }
+
+  function calcScore() {
+    return Object.values(answers).reduce((s, v) => s + Number(v), 0);
+  }
+
+  function getLevel(score) {
+    return DX_LEVELS.find(l => l && score >= l.range[0] && score <= l.range[1]) || DX_LEVELS[1];
+  }
+
+  function showResult() {
+    document.querySelectorAll('.dx-step').forEach(s => s.classList.remove('active'));
+    $('dx-nav').style.display = 'flex';
+    $('dx-back-btn').style.display = 'inline-block';
+    $('dx-next-btn').style.display = 'none';
+    $('dx-progress-wrap').style.display = 'block';
+    $('dx-progress-label').textContent = '診断結果';
+    $('dx-progress-bar').style.width = '100%';
+
+    const score = calcScore();
+    const level = getLevel(score);
+
+    // スコアリング表示
+    $('dx-score-val').textContent = score;
+    $('dx-score-title').textContent = level.title;
+    $('dx-score-sub').textContent = level.sub.replace('{score}', score);
+
+    // リングアニメーション
+    const pct = (score - 4) / 16; // 4〜20を0〜1に
+    const circumference = 326.7;
+    setTimeout(() => {
+      $('dx-ring-arc').style.strokeDashoffset = circumference * (1 - pct);
+    }, 100);
+
+    // 課題・効果リスト
+    const issuesList = $('dx-issues-list');
+    const effectsList = $('dx-effects-list');
+    issuesList.innerHTML = level.issues.map(i => `<li>${i}</li>`).join('');
+    effectsList.innerHTML = level.effects.map(e => `<li>${e}</li>`).join('');
+
+    currentStep = TOTAL + 1;
+    $('dx-result').style.display = 'block';
+    setTimeout(() => $('dx-result').classList.add('visible'), 50);
+    $('dx-modal').scrollTop = 0;
+  }
+
+  async function submit() {
+    const name  = $('dx-name').value.trim();
+    const email = $('dx-email').value.trim();
+    if (!name || !email) {
+      $('dx-form-error').classList.add('show');
+      return;
+    }
+    $('dx-form-error').classList.remove('show');
+
+    const btn = $('dx-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="dx-spinner"></span>送信中…';
+
+    const score  = calcScore();
+    const level  = getLevel(score);
+    const office = $('dx-office').value.trim();
+    const tel    = $('dx-tel').value.trim();
+
+    /* ── GAS へのデータマッピング（1号機構造を維持） ── */
+    const payload = {
+      timestamp:   new Date().toISOString(),
+      name:        name,
+      office:      office,
+      email:       email,
+      tel:         tel,
+      score:       score,
+      level:       level.title,
+      q1_inquiry:  answers[1] || '',
+      q2_data:     answers[2] || '',
+      q3_content:  answers[3] || '',
+      q4_booking:  answers[4] || '',
+      source:      'path-flow-lp-v4',
+    };
+
+    try {
+      if (DX_CONFIG.GAS_ENDPOINT !== 'YOUR_GAS_ENDPOINT_URL') {
+        await fetch(DX_CONFIG.GAS_ENDPOINT, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        // 開発モード：コンソール確認
+        console.log('[DX] GAS payload:', payload);
+        await new Promise(r => setTimeout(r, 800));
+      }
+    } catch (e) {
+      console.warn('[DX] GAS送信エラー（無視して続行）:', e);
+    }
+
+    // Googleカレンダーリンク生成
+    const eventTitle = encodeURIComponent(`【Path-Flow相談】${name} 様`);
+    const eventDesc  = encodeURIComponent(
+      `士業DX診断スコア: ${score}/20（${level.title}）\n` +
+      `事務所: ${office}\nメール: ${email}\nTEL: ${tel}`
+    );
+    const now   = new Date();
+    const start = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000); // 2日後仮設定
+    const end   = new Date(start.getTime() + 30 * 60 * 1000);
+    const fmt   = d => d.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
+    const gcalUrl = `${DX_CONFIG.GCAL_BASE}&text=${eventTitle}&details=${eventDesc}&dates=${fmt(start)}/${fmt(end)}`;
+    $('dx-gcal-btn').href = gcalUrl;
+
+    // 完了表示
+    $('dx-result').style.display = 'none';
+    $('dx-nav').style.display = 'none';
+    $('dx-progress-wrap').style.display = 'none';
+    $('dx-complete').style.display = 'block';
+    $('dx-complete').classList.add('active');
+    $('dx-modal').scrollTop = 0;
+  }
+
+  // オプション選択のイベント委譲
+  document.addEventListener('click', e => {
+    const opt = e.target.closest('.dx-option');
+    if (!opt) return;
+    const step = Number(opt.closest('.dx-step').dataset.step);
+    const val  = Number(opt.dataset.val);
+    selectOption(opt, step, val);
+  });
+
+  // オーバーレイクリックで閉じる
+  document.getElementById('dx-modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('dx-modal-overlay')) close();
+  });
+
+  return { open, close, next, prev, submit };
+})();
+</script>
+
 </body>
 </html>
