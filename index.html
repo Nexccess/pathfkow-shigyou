@@ -1090,9 +1090,8 @@ function switchCase(idx){
    ★ 接続設定（GAS URLを設定してください）
    ═══════════════════════════════════════════════════ */
 const DX_CONFIG = {
-  // ▼▼▼ GAS デプロイURL（1号機から流用）
-  GAS_ENDPOINT: 'https://script.google.com/macros/s/AKfycbx_47vG-wjEIaI6vwiFbK7DLOfpN03QqpVXVwWKke7uSiT1-uceyM0CJRpkjgnbQGtc/exec',
-  // ▼▼▼ Google Calendar: 担当者のカレンダーID または予約URL
+  // ▼▼▼ Vercel APIエンドポイント（1号機と同じサーバーレス関数方式）
+  API_ENDPOINT: '/api/save-shigyou',
   GCAL_BASE: 'https://calendar.google.com/calendar/render?action=TEMPLATE',
   SERVICE_NAME: 'Path-Flow 士業DX診断 個別相談',
 };
@@ -1353,17 +1352,14 @@ const DX = (() => {
     };
 
     try {
-      if (DX_CONFIG.GAS_ENDPOINT !== 'YOUR_GAS_ENDPOINT_URL') {
-        await fetch(DX_CONFIG.GAS_ENDPOINT, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      } else {
-        // 開発モード：コンソール確認
-        console.log('[DX] GAS payload:', payload);
-        await new Promise(r => setTimeout(r, 800));
+      const resp = await fetch(DX_CONFIG.API_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        console.warn('[DX] API error:', err);
       }
     } catch (e) {
       console.warn('[DX] GAS送信エラー（無視して続行）:', e);
