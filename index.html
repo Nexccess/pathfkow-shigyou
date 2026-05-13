@@ -1336,20 +1336,24 @@ const DX = (() => {
     const office = $('dx-office').value.trim();
     const tel    = $('dx-tel').value.trim();
 
-    /* ── GAS へのデータマッピング（1号機構造を維持） ── */
+    /* ── GAS へのデータマッピング（1号機の data.row 配列構造を継承） ──
+       列順: 診断日時 / 氏名 / 事務所名 / メール / TEL /
+             スコア / レベル / Q1 / Q2 / Q3 / Q4 / 流入元   */
     const payload = {
-      timestamp:   new Date().toISOString(),
-      name:        name,
-      office:      office,
-      email:       email,
-      tel:         tel,
-      score:       score,
-      level:       level.title,
-      q1_inquiry:  answers[1] || '',
-      q2_data:     answers[2] || '',
-      q3_content:  answers[3] || '',
-      q4_booking:  answers[4] || '',
-      source:      'path-flow-lp-v4',
+      row: [
+        new Date().toISOString(),          // 診断日時
+        name,                              // 氏名
+        office,                            // 事務所名
+        email,                             // メールアドレス
+        tel,                               // 電話番号
+        score,                             // スコア（4〜20）
+        level.title,                       // レベル
+        answers[1] || '',                  // Q1_問い合わせ対応
+        answers[2] || '',                  // Q2_データ管理
+        answers[3] || '',                  // Q3_情報発信
+        answers[4] || '',                  // Q4_予約方法
+        'path-flow-lp-v4',                 // 流入元
+      ],
     };
 
     try {
