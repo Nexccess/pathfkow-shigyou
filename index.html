@@ -641,54 +641,7 @@ function switchCase(idx){
   document.querySelectorAll('.case-content').forEach((c,i) => c.classList.toggle('active', i===idx));
 }
 </script>
-<script>
-const observer = new IntersectionObserver(entries => {
-  entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('visible'); observer.unobserve(e.target); }});
-}, { threshold: 0.1 });
-document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
-function switchCase(idx){
-  document.querySelectorAll('.case-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
-  document.querySelectorAll('.case-content').forEach((c,i) => c.classList.toggle('active', i===idx));
-}
-
-/**
- * GASウェブアプリへデータを送信する関数
- */
-async function sendToGAS(data) {
-  const webAppUrl = "https://script.google.com/macros/s/AKfycbxW1OF6WAAe_5vGmi52nsoTZ4zbLCoKDma5UY4cwq0zFTvydvQ7wMgZNWv9BNk3yiiOhQ/exec";
-
-  try {
-    await fetch(webAppUrl, {
-      method: "POST",
-      mode: "no-cors",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data)
-    });
-    console.log("Data sent to GAS successfully");
-  } catch (error) {
-    console.error("Error sending to GAS:", error);
-  }
-}
-
-/**
- * フォーム送信や診断完了時に呼び出す実行関数
- */
-function submitDiagnosis(score, resultText) {
-  const payload = {
-    name: document.getElementById('userName')?.value || "匿名",
-    email: document.getElementById('userEmail')?.value || "未入力",
-    score: score,
-    diagnosis_result: resultText
-  };
-  sendToGAS(payload);
-}
-</script>
-
-</body>
-</html>
 <!-- ════════════════════════════════════════════
      PATH-FLOW 士業DX診断 — 診断・送信・予約システム
      ════════════════════════════════════════════ -->
