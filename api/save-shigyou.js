@@ -82,7 +82,7 @@ module.exports = async function handler(req, res) {
         },
         body: JSON.stringify({
           from: 'Path-Flow診断 <onboarding@resend.dev>',
-          to: ['info@nexccess.com'],
+          to: ['naka.kei@nexccess.com'],
           subject: `【新規予約】${row[1]} 様 ／ スコア${row[5]}点（${row[6]}）`,
           html: `
 <h2>Path-Flow 士業DX診断 ― 新規予約通知</h2>
