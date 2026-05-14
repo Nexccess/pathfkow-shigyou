@@ -4,10 +4,13 @@ const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
 
 function getAuthClient() {
-  const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+  // Vercel環境変数で \\n が二重エスケープされるケースに対応
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  const credentials = JSON.parse(raw);
+  const privateKey = credentials.private_key.replace(/\\n/g, '\n');
   return new JWT({
     email: credentials.client_email,
-    key: credentials.private_key,
+    key: privateKey,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 }
