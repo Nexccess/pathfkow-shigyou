@@ -4,9 +4,11 @@ const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
 
 function getAuthClient() {
-  // Vercel環境変数で \\n が二重エスケープされるケースに対応
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  let raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '';
+  // 前後の余分なクォート・空白を除去（Vercelコピペ時の混入対策）
+  raw = raw.trim().replace(/^['"]|['"]$/g, '');
   const credentials = JSON.parse(raw);
+  // 秘密鍵の \\n を実改行に変換
   const privateKey = credentials.private_key.replace(/\\n/g, '\n');
   return new JWT({
     email: credentials.client_email,
@@ -33,12 +35,19 @@ module.exports = async function handler(req, res) {
     const auth   = getAuthClient();
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // ヘッダー行が存在しない場合に自動作成
-    const check = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: '士業DX診断結果!A1',
-    });
-    if (!check.data.values || check.data.values.length === 0) {
+    // シートの存在確認 → なければ作成
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+    const sheetExists = meta.data.sheets.some(
+      s => s.properties.title === '士業DX診断結果'
+    );
+    if (!sheetExists) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_ID,
+        requestBody: {
+          requests: [{ addSheet: { properties: { title: '士業DX診断結果' } } }],
+        },
+      });
+      // ヘッダー行を追加
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
         range: '士業DX診断結果!A1',
@@ -61,6 +70,40 @@ module.exports = async function handler(req, res) {
       insertDataOption: 'INSERT_ROWS',
       requestBody: { values: [row] },
     });
+
+    // ── Resendでメール通知 ──────────────────────────
+    const RESEND_API_KEY = process.env.RESEND_API_KEY;
+    if (RESEND_API_KEY) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'Path-Flow診断 <onboarding@resend.dev>',
+          to: ['info@nexccess.com'],
+          subject: `【新規予約】${row[1]} 様 ／ スコア${row[5]}点（${row[6]}）`,
+          html: `
+<h2>Path-Flow 士業DX診断 ― 新規予約通知</h2>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-family:sans-serif;font-size:14px;">
+  <tr><th align="left">診断日時</th><td>${row[0]}</td></tr>
+  <tr><th align="left">氏名</th><td>${row[1]}</td></tr>
+  <tr><th align="left">事務所名</th><td>${row[2] || '―'}</td></tr>
+  <tr><th align="left">メール</th><td>${row[3]}</td></tr>
+  <tr><th align="left">電話</th><td>${row[4] || '―'}</td></tr>
+  <tr><th align="left">スコア</th><td><strong>${row[5]}点</strong></td></tr>
+  <tr><th align="left">レベル</th><td>${row[6]}</td></tr>
+  <tr><th align="left">Q1 問い合わせ対応</th><td>${row[7]}</td></tr>
+  <tr><th align="left">Q2 データ管理</th><td>${row[8]}</td></tr>
+  <tr><th align="left">Q3 情報発信</th><td>${row[9]}</td></tr>
+  <tr><th align="left">Q4 予約方法</th><td>${row[10]}</td></tr>
+</table>
+<p style="margin-top:16px;color:#666;">このメールはPath-Flow診断システムから自動送信されました。</p>
+          `.trim(),
+        }),
+      });
+    }
 
     return res.status(200).json({ success: true });
 
